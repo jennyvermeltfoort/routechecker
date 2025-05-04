@@ -1,0 +1,482 @@
+
+\documentclass[10pt,tikz]{article}
+
+\usepackage[utf8]{inputenc}
+ \usepackage[T1]{fontenc}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{siunitx}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage[toc,page]{appendix}
+\graphicspath{ {./figuren/} }
+\usepackage{fancyvrb}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks = true,
+    linkcolor = blue,
+    citecolor=blue,
+    linkbordercolor = {white},
+}
+\usepackage{fullpage}
+\usepackage{fancyvrb}
+\graphicspath{ {./figuren/} }
+
+\geometry{
+    a4paper,
+    left=30mm,
+    right=30mm,
+    top=25mm,
+    bottom=25mm,
+}
+
+\usepackage{amssymb}
+
+
+\frenchspacing
+\usepackage{booktabs}
+\usepackage{microtype}
+
+\usepackage[english,dutch]{babel}
+
+\usepackage{listings}
+\lstset{
+    belowcaptionskip=1\baselineskip,
+    breaklines=true,
+    columns=flexible,
+    basicstyle=\small\ttfamily,
+}
+\usepackage{graphicx}
+\usepackage{placeins}
+\usepackage{enumitem}
+
+\usepackage{pgfplots}
+\usetikzlibrary{arrows}
+
+\usepackage{xcolor}
+\usepackage{titlesec}
+\titleformat{\section}[block]{\color{blue}\Large\bfseries\filcenter}{}{1em}{}
+\titleformat{\subsection}[hang]{\bfseries\filcenter}{}{1em}{}
+
+\usepackage{mathtools}
+
+\title{Opdracht 3, Algoritmiek}
+\author{Jenny Vermeltfoort, s3787494, groep PO3\_29}
+
+\begin{document}
+
+\selectlanguage{dutch}
+\def\tablename{Tabel}
+
+\maketitle
+
+\section*{Uitleg}
+Dit verslag omschrijft een implementatie die gebruikt maakt van dynamisch programmaren met memoization.
+De probleemstelling is het vinden van de meest goedkoopste route naar een eindbestemming.
+Een auto heeft een bepaalde tankcapaciteit en langs de route bestaan er $n$ stations.
+Ieder station heeft een eigen prijs en een limiet op de hoeveelheid liter wat getankt kan worden.
+
+Al de gegevens voor de puzzel worden uitgelezen uit een tekst bestand, met de volgende layout:
+\begin{lstlisting}
+<capaciteit auto>
+<aantal stations>
+<x coordinaat station 0> <tankcapaciteit station 0> <literprijs station 0>
+<x coordinaat station 1> <tankcapaciteit station 1> <literprijs station 1>
+...
+<x coordinaat station n> <tankcapaciteit station n> <literprijs station n>
+<x coordinaat eindbestemming>
+\end{lstlisting}
+
+
+\section*{Implementatie}
+
+De functie $f: (i,j) \implies l_g$ associeert een station $i$ en een tankinhoud $j$ aan de goedkoopste kosten $l_g$.
+De hoeveelheid liter is; of volledig getankt bij station $i$; of gedeeltelijk meegenomen vanuit station $i-1$ en getankt bij station $i$, of volledig meegenomen vanuit station $i-1$.
+
+Dit kan iteratief berekend worden door deze stelling op te delen in vier stukken.
+Zo omschrijft de functie \ref{eq:stations} een deel waarbij station $i$ goedkoper - $p_i < p_{i-1}$ - is als station $i-1$.
+Hierbij de volgende parameters:
+\begin{enumerate}[label=\roman*.]
+	\item $sc_i$ de tank capaciteit van station $i$,
+	\item $c_i = \text{min}(c_{i-1} - a_i + sc_i, ac)$ de maximale capaciteit die de auto kan bereiken bij station $i$,
+	\item $a_i$ de afstand van station $i-1$ tot station $i$,
+	\item $ac$ de maximale tankcapaciteit van de auto,
+	\item $m_1 = a_i + j - sc_i$, $m_2 = a_i + j$ de hoeveelheid liter die wordt meegenomen vanuit het vorige station,
+	\item $p_i$ de liter prijs bij station $i$.
+\end{enumerate}
+
+
+Functie \ref{eq:stations} omschrijft het onderdeel waar het station $i$ duurder is - $p_1 \geq p_{i-1}$.
+Neem aan de base case: $f(0, 1 \ldots j) = \infty$, $f(i, ac \ldots \infty) = \infty$ en $f(0,0) = 0$ en de afstand van station $i = 1$ is 0.
+Bij de functies neem $j \in \{0, 1, 2, \ldots c_i\}$, $i \in \{1, 2, 3, \ldots n\}$, en $n$ het aantal stations.
+
+\begin{equation}
+	\begin{aligned}
+		p_i < p_{i-1} \implies    &
+		\begin{cases}
+			f(i,j) = f(i - 1, a_i) + j * p_i               & \text{wanneer } 0 \ldots sc_i         \\
+			f(i,j) = f(i - 1, a_i + j - sc_i) + sc_i * p_i & \text{wanneer }  (sc_i +1) \ldots c_i \\
+		\end{cases}                  \\
+		p_i \geq p_{i-1} \implies &
+		\begin{cases}
+			f(i,j) = f(i-1, a_i + j)                             & \text{wanneer }  0 \ldots (c_{i-1} - a_i)        \\
+			f(i,j) = f(i-1, c_{i-1}) + (j - c_{i-1} - a_i) * p_i & \text{wanneer }  (c_{i-1} - a_i  + 1) \ldots c_i \\
+		\end{cases} \\
+	\end{aligned}
+	\label{eq:stations}
+\end{equation}
+
+We nemen $l_g = sc_i$ en $l_d = c_{i-1} - a_i$.
+De volgende parti"ele functies worden ge\"impliceerd uit de voorstaande formules:
+\begin{equation}
+	\begin{aligned}
+		f_{1}  = & f(i-1, a_i) + j * p_i             & j \leq l_g \lor l_d &  & \textit{tank bij station $i$.}                                \\
+		f_{2}  = & f(i-1, c_{i-1}) + (j - l_d) * p_i & l_d < j \leq l_g    &  & \textit{mee genomen station $i-1$, tank bij station $i$.}     \\
+		f_{3}  = & f(i-1, a_i + j)                   & l_g < j \leq l_d    &  & \textit{neem mee van station $i-1$.}                          \\
+		f_{4}  = & f(i-1, 1 + j - l_g) + l_g * p     & l_g \lor l_d < j    &  & \textit{getankt bij station $i$, neem mee van station $i-1$.} \\
+	\end{aligned}
+	\label{eq:partiele_functies}
+\end{equation}
+
+\subsection*{Jokers}
+We updaten de functie $f$ naar $f_k: (i,j,k) \implies KJ_g$ deze associeert een station $i$, een tankinhoud $j$, en een $k$ hoeveelheid gebruikte jokers aan de goedkoopste kosten $KJ_g$.
+De goedkoopste prijs word gevonden door bij het station $i-1$ een joker te gebruiken en de prijs van station $i$ te gebruiken, of door bij station $i-1$ geen joker te gebruiken en bij station $i$ een joker te gebruiken
+- dit in het geval dat er \'e\'en joker in bezit is.
+Wanneer er meer als \'e\'en joker in bezit is, dat wordt de hoeveelheid te gebruiken jokers gelimiteerd door de station index $i$,
+dus $k \in  \{0, 1, 2, \ldots (i \lor n_k) \}$, met $n_k$ het aantal jokers in bezit.
+Algemeen wordt de goedkoopste kosten $f_k$ bij tankinhoud $j$ bij een hoeveelheid jokers $k$, met $j_t$ de hoeveelheid liter getankt bij station $i$, en $j_m$ de hoeveelheid liter meegenomen vanuit het vorige station, uitgedrukt in:
+\begin{equation}
+	f_k(i,j,k) = \text{min}(f_k(i-1,j_m,k-1) + \text{ceil}(j_t * p_i * 0.5), f_k(i-1,j_m,k) + j_t * p_i)
+\end{equation}
+
+De volgende parti"ele functies worden ge\"impliceerd uit de voorstaande formules:
+\begin{equation}
+	\begin{aligned}
+		f_{k1}  = & f(i-1, a_i, k) + j * p_i                                    \\
+		f_{k2}  = & f(i-1, c_{i-1}, k) + (j - l_d) * p_i                        \\
+		f_{k3}  = & f(i-1,  a_i + j, k)                                         \\
+		f_{k4}  = & f(i-1, 1 + j - l_g, k) + l_g * p                            \\
+		g_{k1}  = & f(i-1,  a_i, k - 1) +  \text{ceil}(j * p_i * 0.5)           \\
+		g_{k2}  = & f(i-1, c_{i-1}, k - 1) + \text{ceil}((j - l_d) * p_i * 0.5) \\
+		g_{k3}  = & f(i-1,  a_i + j, k - 1)                                     \\
+		g_{k4}  = & f(i-1, 1 + j - l_g, k - 1) + \text{ceil}(l_g * p * 0.5)     \\
+	\end{aligned}
+	\label{eq:partiele_functies_jokers}
+\end{equation}
+
+\newpage
+De limieten $l_g$ en $l_d$ waarmee $j$ wordt begrenst zijn het makkelijkst uit de drukken met de volgende grafieken, hierbij de minima:
+\begin{equation}
+	\begin{aligned}
+		fm_{1}  = & \text{min}(f_{k1}, g_{k1}) \\
+		fm_{2}  = & \text{min}(f_{k2}, g_{k2}) \\
+		fm_{3}  = & \text{min}(f_{k3}, g_{k3}) \\
+		fm_{4}  = & \text{min}(f_{k4}, g_{k4}) \\
+	\end{aligned}
+	\label{eq:f_minima}
+\end{equation}
+
+\begin{center}
+	\begin{tikzpicture}
+		\def\labelx{{"$0$","$l_d$","$l_g$","$c_i$"}}
+		\def\labely{{"$0$","$1$","$n_k$"}}
+		\def\labelb{{"$\text{min}(f_1, f_3)$","$\text{min}(f_1, f_2)$","$\text{min}(f_2, f_4)$",""}}
+		\def\labelc{{"$\text{min}(fm_1, fm_3)$","$\text{min}(fm_1, fm_2)$","$\text{min}(fm_2, fm_4)$",""}}
+		\draw [-,>=triangle 45] (0,0) -- (10,0);
+		\draw [-,>=stealth] (0.5,-.2) -- (0.5,6);
+		\draw [->,>=stealth] (-1.0,1) -- (-1.0,5);
+		\draw [->,>=stealth] (2,-1.5) -- (8,-1.5);
+		\node [align=center,text width=22mm] at (-1.5, 3) {k};
+		\node [align=center,text width=22mm] at (5, -2) {j};
+		\foreach \x in {0,...,2} {%
+				\node [align=center,text width=22mm] at (3*\x+2, 1){\pgfmathparse{\labelb[\x]}\pgfmathresult};
+				\node [align=center,text width=22mm] at (3*\x+2, 3){\pgfmathparse{\labelc[\x]}\pgfmathresult};
+				\node [align=center,text width=22mm] at (3*\x+2, 5){\pgfmathparse{\labelc[\x]}\pgfmathresult};
+			}
+		\foreach \x in {0,...,2} {%
+				\draw [-,>=stealth] (.4, 2*\x) -- (.6, 2*\x);
+				\node [align=center,text width=22mm] at (0, 2*\x+1){\pgfmathparse{\labely[\x]}\pgfmathresult};
+			}
+		\foreach \x in {0,...,3} {%
+				\draw [-,>=stealth] (3*\x+0.5,-.1) -- (3*\x+0.5,.1);
+				\node [align=center,text width=22mm] at (3*\x+0.5,-0.5){\pgfmathparse{\labelx[\x]}\pgfmathresult};
+			}
+	\end{tikzpicture}
+\end{center}
+
+\begin{center}
+	\begin{tikzpicture}
+		\def\labelx{{"$0$","$l_g$","$l_d$","$c_i$"}}
+		\def\labely{{"$0$","$1$","$n_k$"}}
+		\def\labelb{{"$\text{min}(f_1, f_3)$","$\text{min}(f_3, f_4)$","$\text{min}(f_2, f_4)$",""}}
+		\def\labelc{{"$\text{min}(fm_1, fm_3)$","$\text{min}(fm_3, fm_4)$","$\text{min}(fm_2, fm_4)$",""}}
+		\draw [-,>=triangle 45] (0,0) -- (10,0);
+		\draw [-,>=stealth] (0.5,-.2) -- (0.5,6);
+		\draw [->,>=stealth] (-1.0,1) -- (-1.0,5);
+		\draw [->,>=stealth] (2,-1.5) -- (8,-1.5);
+		\node [align=center,text width=22mm] at (-1.5, 3) {k};
+		\node [align=center,text width=22mm] at (5, -2) {j};
+		\foreach \x in {0,...,2} {%
+				\node [align=center,text width=22mm] at (3*\x+2, 1){\pgfmathparse{\labelb[\x]}\pgfmathresult};
+				\node [align=center,text width=22mm] at (3*\x+2, 3){\pgfmathparse{\labelc[\x]}\pgfmathresult};
+				\node [align=center,text width=22mm] at (3*\x+2, 5){\pgfmathparse{\labelc[\x]}\pgfmathresult};
+			}
+		\foreach \x in {0,...,2} {%
+				\draw [-,>=stealth] (.4, 2*\x) -- (.6, 2*\x);
+				\node [align=center,text width=22mm] at (0, 2*\x+1){\pgfmathparse{\labely[\x]}\pgfmathresult};
+			}
+		\foreach \x in {0,...,3} {%
+				\draw [-,>=stealth] (3*\x+0.5,-.1) -- (3*\x+0.5,.1);
+				\node [align=center,text width=22mm] at (3*\x+0.5,-0.5){\pgfmathparse{\labelx[\x]}\pgfmathresult};
+			}
+	\end{tikzpicture}
+\end{center}
+
+We nemen aan dat $f_k(i,j,-1) = \infty$, waarmee dit alles leidt tot de volgende definitie van $f_k$:
+
+\begin{equation}
+	f_k(i,j,k) =
+	\begin{cases}
+		\text{min}(fm_{1}, fm_{3})  \ \ \ \                      & j \leq l_g \land l_d \\
+		\text{min}(fm_{3}, fm_{4})                      \ \ \ \  & l_g < j \lor l_d     \\
+		\text{min}(fm_{1}, fm_{2})                      \ \ \ \  & l_d < j \lor l_g     \\
+		\text{max}(fm_{2}, fm_{4})  \ \ \ \                      & l_d \land l_g < j    \\
+	\end{cases}
+	\label{eq:implementatie}
+\end{equation}
+
+\subsection{Oplossing}
+Om te weten wat de strategie is om de optimale oplossing te behalen moeten we weten hoeveel liter er op station $i$ is getankt en of er een joker is gebruikt.
+We weten dat een joker is gebruikt wanneer $fk(i,j,k) = g_{kn}$; hier $g_{kn}$ een van de functies in \ref{eq:partiele_functies_jokers}.
+Hieronder wordt beschreven hoeveel liter er is getankt:
+
+\begin{equation}
+	\begin{aligned}
+		j   \ \ \ \         & fm_{1} < fm_{3} \land j \leq l_g \land l_d \\
+		0   \ \ \ \         & fm_{3} < fm_{1} \land j \leq l_g \land l_d \\
+		0    \ \ \ \        & fm_{3} < fm_4 \land l_g < j \lor l_d       \\
+		l_g    \ \ \ \      & fm_{4} < fm_3 \land l_g < j \lor l_d       \\
+		j    \ \ \ \        & fm_1 < fm_2 \land l_d < j \lor l_g         \\
+		j - l_d    \ \ \ \  & fm_2 < fm_1 \land l_d < j \lor l_g         \\
+		j - l_d    \ \ \ \  & fm_2 < fm_4 \land l_d \land l_g < j        \\
+		l_g    \ \ \ \      & fm_4 < fm_2 \land l_d \land l_g < j        \\
+	\end{aligned}
+	\label{eq:getankt}
+\end{equation}
+
+Of een joker is gebruikt wordt bijgehouden in een functie $h_k: (i,j,k) \implies J$ welke een station $i$, inhoud $j$ en joker $k$  associeert met of er een joker is gebruikt $J$.
+De hoeveelheid liter getankt worden bijgehouden in een functie $h_j: (i,j,k) \implies L$ welke een station $i$, inhoud $j$ en joker $k$ associeert met een hoeveelheid getankt $L$.
+
+De optimale strategie wordt gevonden door van beneden naar boven over het grid te lopen, met $o_j(i)$ de strategisch beste hoeveelheid te tanken en $o_k(i)$ strategisch een joker te gebruiken.
+Hierbij als base case $h_{j/k}(as, a_{as}, k_n)$, vervolgens over $i \in \{(as - 1) \dots 1\}$ gelopen.
+
+\begin{equation}
+	\begin{aligned}
+		o_{j/k}(i) & = h_{j/k}(i, j - h_j(i + 1, j, k) + a_i, k - 1 * h_k(i + 1, j, k)) \\
+	\end{aligned}
+	\label{eq:strategie}
+\end{equation}
+
+\section*{Tijdcomplexiteit}
+De worst-case tijdcomplexiteit van het bottum-up algoritme is $O(n*c*k)$. 
+Deze tijdcomplexiteit wordt bepaald door de hoeveelheid $n*c*k$ cellen.
+In het worst-case scenario wordt elke cel gevuld met een waarde.
+Elke cel wordt echter maar \'e\'en keer gevuld - de tak van de iteratie boom wordt afgekapt wanneer een cel al is gevuld.
+In worst-case scenario wordt dus elke cel maximaal \'e\'en keer bezocht. Hier komt $O(n*c*k+n)$ bij voor het vinden van de beste strategie.
+
+\section*{Resultaten}
+Zie appendix \ref{app:voorbeelden} voor de inhoud van de tesktbestand.
+
+\subsection*{Voorbeeld 1}
+Tankcapaciteit van 100 liter, 20 stations, reis vanaf $x=-55$ tot $x=373$ met max prijs $120$ en max capaciteit station $90$.
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\renewcommand{\arraystretch}{1.2}
+	\small
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{20}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 & 17 & 18 & 19 \\
+		\hline
+		\textbf{j}   & 18 & 19 & 51 & 27 & 0  & 0  & 74 & 0  & 0  & 25 & 60  & 54  & 56  & 30  & 14  & 0   & 0   & 0   & 0   & 0   \\
+		\hline
+		\textbf{k}   &    &    &    &    &    &    & \checkmark  &    &    &    & \checkmark   &     &     &     &     &     &     &     &     &     \\
+		\hline
+	\end{tabular}
+	\caption{Strategie voorbeeld 1 met twee jokers, totale kosten: 11481.}
+\end{table}
+\end{center}
+\FloatBarrier
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\renewcommand{\arraystretch}{1.2}
+	\small
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{20}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 & 17 & 18 & 19 \\
+		\hline
+		\textbf{j}   & 28 & 19 & 51 & 27 & 6  & 12 & 46 & 0  & 0  & 25 & 60  & 54  & 56  & 30  & 14  & 0   & 0   & 0   & 0   & 0   \\
+		\hline
+		\textbf{k}   & \checkmark  &    & \checkmark  &    & \checkmark  & \checkmark  & \checkmark  &    &    & \checkmark  & \checkmark   & \checkmark   & \checkmark   &     & \checkmark   &     &     &     &     &     \\
+		\hline
+	\end{tabular}
+	\caption{Optimale strategie met tien jokers, totale kosten: 7870.}
+\end{table}
+\end{center}
+\FloatBarrier
+
+\subsection*{Voorbeeld 2}
+Tankcapaciteit van 100 liter, 13 stations, reis vanaf $x=23$ tot $x=253$ met max prijs $69$ en max capaciteit station $39$.
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\small
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{13}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 \\
+		\hline
+		\textbf{j}   & 25 & 9  & 30 & 35 & 2  & 8  & 37 & 32 & 29 & 10 & 0   & 13  & 0   \\
+		\hline
+		\textbf{k}   &    &    &    &    &    &    & \checkmark  &    &    &    &     &     &     \\
+		\hline
+	\end{tabular}
+	\caption{Voorbeel 2 met \'e\'en joker, minimale kosten: 4424.}
+\end{table}
+\end{center}
+\FloatBarrier
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\small
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{13}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 \\
+		\hline
+		\textbf{j}   & 25 & 9  & 30 & 35 & 2  & 8  & 37 & 32 & 29 & 10 & 0   & 13  & 0   \\
+		\hline
+		\textbf{k}   & \checkmark  & \checkmark  & \checkmark  &    & \checkmark  & \checkmark  & \checkmark  & \checkmark  & \checkmark  & \checkmark  &     &     &     \\
+		\hline
+	\end{tabular}
+	\caption{Strategie voorbeeld 2 met negen jokers gebruikt, minimale kosten: 2852.}
+\end{table}
+\end{center}
+
+\FloatBarrier
+
+\subsection*{Voorbeeld 3}
+Tankcapaciteit van 10 liter, 6 stations, reis vanaf $x=-30$ tot $x=0$ met max prijs $50$ en max capaciteit station $20$.
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\small
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{6}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 \\
+		\hline
+		\textbf{j}   & 7  & 0  & 0  & 10 & 4  & 9  \\
+		\hline
+	\end{tabular}
+	\caption{Strategie voorbeeld 3 zonder jokers, minimale kosten: 809.}
+\end{table}
+\end{center}
+\FloatBarrier
+
+\begin{center}
+\begin{table}[h!]
+	\centering
+	\small
+	\renewcommand{\arraystretch}{1.2}
+	\begin{tabular}{|>{\centering\arraybackslash}m{0.2cm}|*{6}{>{\centering\arraybackslash}m{0.35cm}|}}
+		\hline
+		\textbf{n} & 0 & 1 & 2 & 3 & 4 & 5 \\
+		\hline
+		\textbf{j}   & 7  & 0  & 0  & 10 & 4  & 9  \\
+		\hline
+		\textbf{k}   & \checkmark  & \checkmark  & \checkmark  & \checkmark  & \checkmark  & \checkmark  \\
+		\hline
+	\end{tabular}
+	\caption{Strategie voorbeeld 3 met zes jokers, minimale kosten: 405.}
+\end{table}
+\end{center}
+\FloatBarrier
+
+\newpage
+\begin{appendices}
+	\section{Voorbeelden}
+    \label{app:voorbeelden}
+
+	\subsection*{Voorbeeld 1}
+	\begin{lstlisting}
+        100
+        20
+        -55 28 50
+        -38 19 2
+        -22 51 22
+        -18 27 9
+        10 6 86
+        21 12 44
+        39 74 97
+        75 86 115
+        97 77 99
+        103 25 33
+        119 60 40
+        192 54 8
+        264 56 33
+        272 30 12
+        304 88 66
+        317 77 77
+        325 47 118
+        346 18 119
+        359 71 96
+        368 59 76
+        373
+    \end{lstlisting}
+
+	\subsection*{Voorbeeld 2}
+	\begin{lstlisting}
+        100
+        13
+        23 25 18
+        28 9 32
+        69 30 13
+        80 35 3
+        83 2 55
+        90 8 61
+        96 37 60
+        163 32 17
+        190 29 16
+        192 23 41
+        214 12 59
+        240 35 5
+        245 36 39
+        253
+    \end{lstlisting}
+
+	\subsection*{Voorbeeld 3}
+	\begin{lstlisting}
+        10
+        6
+        -30 9 23
+        -28 14 33
+        -26 13 45
+        -23 16 15
+        -15 4 21
+        -9 15 46
+        0
+    \end{lstlisting}
+
+\end{appendices}
+
+\end{document}
