@@ -73,15 +73,20 @@ typedef struct {
            [JOKERS_MAX + 1];  // De functie h_k, zie verslag.
 } rman_t;
 
-inline bool is_nummer(char c) { return ('0' <= c && c <= '9'); }
+// inline
+bool is_nummer(char c) { return ('0' <= c && c <= '9'); }
 
-inline int min(int a, int b) { return a * (a < b) + b * (b <= a); }
+// inline
+int min(int a, int b) { return a * (a < b) + b * (b <= a); }
 
-inline unsigned int umin(unsigned int a, unsigned int b) { return a * (a < b) + b * (b <= a); }
+// inline
+unsigned int umin(unsigned int a, unsigned int b) { return a * (a < b) + b * (b <= a); }
 
-inline unsigned int umax(unsigned int a, unsigned int b) { return a * (a > b) + b * (b >= a); }
+// inline
+unsigned int umax(unsigned int a, unsigned int b) { return a * (a > b) + b * (b >= a); }
 
-inline unsigned int cceil(float x) {
+// inline
+unsigned int cceil(float x) {
     int y = (int)x;
     if (x == (float)y) {
         return y;
@@ -177,31 +182,31 @@ rman_res_e init_man(rman_t* r) {
 
     for (int i = 0; i < r->handle.as + 1; i++) {
         for (int j = 0; j < F_I_GROOT; j++) {
-            for (int k = 0; k < F_K_GROOT; k++) {
+            for (int k = -1; k < F_K_GROOT; k++) {
                 r->f.f[i][j][k] = INF;
             }
         }
     }
     r->f.f[0][0][0] = 0;
 
-    for (int i = 0; i < F_J_GROOT; i++) {
-        for (int j = 0; j < F_I_GROOT; j++) {
-            r->f.p[i][j][0] = INF;
-        }
-    }
+    // for (int i = 0; i < F_J_GROOT; i++) {
+    //     for (int j = 0; j < F_I_GROOT; j++) {
+    //         r->f.p[i][j][0] = INF;
+    //     }
+    // }
 
     return RMAN_RES_OK;
 }
 
 /**
- * @brief Zoek een oplossing met memoization en een bottom up orde.
+ * @brief Zoek een oplossing met memoization en een top down orde.
  * @param r Een geinitializeerde route manager.
  * @param i Station i.
  * @param j Tankinhoud j.
  * @param k Jokers in gebruik k.
  * @return unsigned int De kosten van de goedkoopste route.
  */
-unsigned int bu(rman_t* r, int i, int j, int k) {
+unsigned int td(rman_t* r, int i, int j, int k) {
     int ld = r->c[i - 1] - r->a[i];
     int lg = r->sc[i];
     int a = r->a[i];
@@ -213,44 +218,44 @@ unsigned int bu(rman_t* r, int i, int j, int k) {
     }
 
     if (j <= lg && j <= ld) {
-        unsigned int f1 = bu(r, i - 1, a, k) + j * p;
-        unsigned int fk1 = bu(r, i - 1, a, k - 1) + cceil(j * p * JOKER_MULT);
+        unsigned int f1 = td(r, i - 1, a, k) + j * p;
+        unsigned int fk1 = td(r, i - 1, a, k - 1) + cceil(j * p * JOKER_MULT);
         unsigned int f1m = umin(f1, fk1);
-        unsigned int f3 = bu(r, i - 1, a + j, k);
-        unsigned int fk3 = bu(r, i - 1, a + j, k - 1);
+        unsigned int f3 = td(r, i - 1, a + j, k);
+        unsigned int fk3 = td(r, i - 1, a + j, k - 1);
         unsigned int f3m = umin(f3, fk3);
         unsigned int f = umin(f1m, f3m);
         r->sj[i - 1][j][k] = (f == f1 || f == fk1) ? j : 0;
         r->sk[i - 1][j][k] = (f == fk1 || f == fk3);
         r->f.f[i][j][k] = f;
     } else if (lg < j && j <= ld) {
-        unsigned int f3 = bu(r, i - 1, a + j, k);
-        unsigned int fk3 = bu(r, i - 1, a + j, k - 1);
+        unsigned int f3 = td(r, i - 1, a + j, k);
+        unsigned int fk3 = td(r, i - 1, a + j, k - 1);
         unsigned int f3m = umin(f3, fk3);
-        unsigned int f4 = bu(r, i - 1, a + j - lg, k) + lg * p;
-        unsigned int fk4 = bu(r, i - 1, a + j - lg, k - 1) + cceil(lg * p * JOKER_MULT);
+        unsigned int f4 = td(r, i - 1, a + j - lg, k) + lg * p;
+        unsigned int fk4 = td(r, i - 1, a + j - lg, k - 1) + cceil(lg * p * JOKER_MULT);
         unsigned int f4m = umin(f4, fk4);
         unsigned int f = umin(f3m, f4m);
         r->sj[i - 1][j][k] = (f == f3 || f == fk3) ? 0 : lg;
         r->sk[i - 1][j][k] = (f == fk3 || f == fk4);
         r->f.f[i][j][k] = f;
     } else if (ld < j && j <= lg) {
-        unsigned int f1 = bu(r, i - 1, a, k) + j * p;
-        unsigned int fk1 = bu(r, i - 1, a, k - 1) + cceil(j * p * JOKER_MULT);
+        unsigned int f1 = td(r, i - 1, a, k) + j * p;
+        unsigned int fk1 = td(r, i - 1, a, k - 1) + cceil(j * p * JOKER_MULT);
         unsigned int f1m = umin(f1, fk1);
-        unsigned int f2 = bu(r, i - 1, cv, k) + (j - ld) * p;
-        unsigned int fk2 = bu(r, i - 1, cv, k - 1) + cceil((j - ld) * p * JOKER_MULT);
+        unsigned int f2 = td(r, i - 1, cv, k) + (j - ld) * p;
+        unsigned int fk2 = td(r, i - 1, cv, k - 1) + cceil((j - ld) * p * JOKER_MULT);
         unsigned int f2m = umin(f2, fk2);
         unsigned int f = umin(f1m, f2m);
         r->sj[i - 1][j][k] = (f == f1 || f == fk1) ? j : j - ld;
         r->sk[i - 1][j][k] = (f == fk1 || f == fk2);
         r->f.f[i][j][k] = f;
     } else if (lg < j && ld < j) {
-        unsigned int f2 = bu(r, i - 1, cv, k) + (j - ld) * p;
-        unsigned int fk2 = bu(r, i - 1, cv, k - 1) + cceil((j - ld) * p * JOKER_MULT);
+        unsigned int f2 = td(r, i - 1, cv, k) + (j - ld) * p;
+        unsigned int fk2 = td(r, i - 1, cv, k - 1) + cceil((j - ld) * p * JOKER_MULT);
         unsigned int f2m = umin(f2, fk2);
-        unsigned int f4 = bu(r, i - 1, a + j - lg, k) + lg * p;
-        unsigned int fk4 = bu(r, i - 1, a + j - lg, k - 1) + cceil(lg * p * JOKER_MULT);
+        unsigned int f4 = td(r, i - 1, a + j - lg, k) + lg * p;
+        unsigned int fk4 = td(r, i - 1, a + j - lg, k - 1) + cceil(lg * p * JOKER_MULT);
         unsigned int f4m = umin(f4, fk4);
         unsigned int f = umin(f2m, f4m);
         r->sj[i - 1][j][k] = (f == f2 || f == fk2) ? j - ld : lg;
@@ -276,6 +281,7 @@ void strategie(rman_t* r, int i, int j, int k) {
 
     r->handle.oj[i - 1] = r->sj[i - 1][j][k];
     r->handle.ok[i - 1] = r->sk[i - 1][j][k];
+    printf("%i\n", k);
     strategie(r, i - 1, j - r->handle.oj[i - 1] + r->a[i], k - 1 * r->handle.ok[i - 1]);
 }
 
@@ -294,14 +300,14 @@ void rman_print(const rman_handle_t* h) {
     }
 }
 
-int rman_los_op_bu(const rman_handle_t* h, int jokers) {
+int rman_los_op_td(const rman_handle_t* h, int jokers) {
     rman_t* r = CONTAINER_OF(h, rman_t, handle);
-    int f = bu(r, r->handle.as - 1, r->a[r->handle.as], jokers);
+    int f = td(r, r->handle.as - 1, r->a[r->handle.as], jokers);
     strategie(r, r->handle.as - 1, r->a[r->handle.as], jokers);
     return f;
 }
 
-int rman_los_op_td(const rman_handle_t* h, int jokers) {
+int rman_los_op_bu(const rman_handle_t* h, int jokers) {
     rman_t* r = CONTAINER_OF(h, rman_t, handle);
     for (int i = 1; i < r->handle.as; i++) {
         int ld = r->c[i - 1] - r->a[i];
@@ -310,30 +316,78 @@ int rman_los_op_td(const rman_handle_t* h, int jokers) {
         int p = r->sp[i];
         int cv = r->c[i - 1];
 
-        for (int k = 0; k <= i && k <= jokers; k++) {
-            for (int j = 0; j <= r->c[i]; j++) {
+        for (int j = 0; j <= r->c[i]; j++) {
+            for (int k = 0; k <= i && k <= jokers; k++) {
+                // Ik gebruik hier de rekenkundige manier van boolean logica om te een veelfout aan
+                // branch prediction misses te voorkomen. Mogelijk lastig te lezen, vandaar wat
+                // extra comments. In principe valt te logica groot en deels samen met de top down
+                // variant.
+
+                // f1 -> minimaal meenemen, de rest tanken.
+                // f2 -> maximaal meenemen, de rest tanken.
+                // f3 -> maximaal meenemen, niet tanken.
+                // f4 -> maximaal tanken, de rest meenemen.
                 unsigned int f1 = r->f.f[i - 1][a][k] + j * p;
-                unsigned int fk1 = r->f.f[i - 1][a][k - 1] + cceil(j * p * JOKER_MULT);
                 unsigned int f2 = r->f.f[i - 1][cv][k] + (j - ld) * p;
-                unsigned int fk2 = r->f.f[i - 1][cv][k - 1] + cceil((j - ld) * p * JOKER_MULT);
                 unsigned int f3 = r->f.f[i - 1][a + j][k];
-                unsigned int fk3 = r->f.f[i - 1][a + j][k - 1];
                 unsigned int f4 = r->f.f[i - 1][a + j - lg][k] + lg * p;
+
+                // De varianten van f1 ... f4 met een joker ingezet.
+                unsigned int fk1 = r->f.f[i - 1][a][k - 1] + cceil(j * p * JOKER_MULT);
+                unsigned int fk2 = r->f.f[i - 1][cv][k - 1] + cceil((j - ld) * p * JOKER_MULT);
+                unsigned int fk3 = r->f.f[i - 1][a + j][k - 1];
                 unsigned int fk4 = r->f.f[i - 1][a + j - lg][k - 1] + cceil(lg * p * JOKER_MULT);
 
+                // Bepaald het minimum tussen wel of geen joker inzetten.
                 unsigned int f1m = umin(f1, fk1);
                 unsigned int f2m = umin(f2, fk2);
                 unsigned int f3m = umin(f3, fk3);
                 unsigned int f4m = umin(f4, fk4);
 
-                r->f.f[i][j][k] =
-                    umin(f1m, f3m) * (j <= lg && j <= ld) + umin(f3m, f4m) * (lg < j && j <= ld) +
-                    umin(f1m, f2m) * (ld < j && j <= lg) + umin(f2m, f4m) * (lg < j && ld < j);
+                // De limieten waarbinnen j moet vallen om f1 ... f4, f1k ... f4k in te zetten.
+                // Wanneer de tankcapaciteit van het vorige station wordt overschreden (ld < j) dan
+                // kunnen we niets anders als tanken, Wanneer de tankcapaciteti van het huidige
+                // station is overschreden kunnen we niet anders dan de reset meenemen. Hier is ook
+                // nog een combinatie mogelijk: alleen tanken, alleen menemen, gedeeltelijk meenemen
+                // + gedeeltelijk tanken, alles tanken + meer menemen,
+                bool fl1 = (j <= lg && j <= ld);
+                bool fl2 = (lg < j && j <= ld);
+                bool fl3 = (ld < j && j <= lg);
+                bool fl4 = (lg < j && ld < j);
+
+                unsigned int f = umin(f1m, f3m) * fl1 + umin(f3m, f4m) * fl2 +
+                                 umin(f1m, f2m) * fl3 + umin(f2m, f4m) * fl4;
+
+                bool sl1 = (fl1 || fl3);
+                bool sl2 = (fl3 || fl4);
+                bool sl3 = (fl1 || fl2);
+                bool sl4 = (fl2 || fl4);
+
+                // De minimale waardes fxm kunnen mogelijk overlappen wanneer de optimale waarde
+                // voor een bepaalde tankcapaciteit hetzelfde is als een tegenhanger. Hier f4m en
+                // f2m; f2m en f1m; hebben overlap wanneer ze vallen binnen de limieten van slx.
+                // slx omschrijft in principe de range waarbinnen j moet vallen, waarmee de limieten
+                // van fxm bepaald worden. Door fxm gelijk te stellen aan f bepalen we de
+                // hoeveelheid diesel wat er getankt is en of er een joker is ingezet (f = fxk).
+                r->sj[i - 1][j][k] = j * sl1 * (f == f1m) + lg * sl4 * (f == f4m && f != f2m) +
+                                     (j - ld) * sl2 * (f == f2m && f != f1m);
+                r->sk[i - 1][j][k] =
+                    (f == fk3) * sl3 + (f == fk1) * sl1 + (f == fk2) * sl2 + (f == fk4) * sl4;
+                r->f.f[i][j][k] = f;
             }
         }
     }
 
     r->f.f[r->handle.as][0][jokers] = r->f.f[r->handle.as - 1][r->a[r->handle.as]][jokers];
+    strategie(r, r->handle.as - 1, r->a[r->handle.as], jokers);
+
+    int sum = 0;
+    for (int i = 0; i < r->handle.as; i++) {
+        float k = (r->handle.ok[i]) ? 0.5f : 1.0f;
+        sum += cceil(k * r->sp[i + 1] * r->handle.oj[i]);
+    }
+    printf("%i\n", sum);
+
     return r->f.f[r->handle.as][0][jokers];
 }
 
