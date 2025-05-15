@@ -73,20 +73,15 @@ typedef struct {
            [JOKERS_MAX + 1];  // De functie h_k, zie verslag.
 } rman_t;
 
-// inline
-bool is_nummer(char c) { return ('0' <= c && c <= '9'); }
+inline bool is_nummer(char c) { return ('0' <= c && c <= '9'); }
 
-// inline
-int min(int a, int b) { return a * (a < b) + b * (b <= a); }
+inline int min(int a, int b) { return a * (a < b) + b * (b <= a); }
 
-// inline
-unsigned int umin(unsigned int a, unsigned int b) { return a * (a < b) + b * (b <= a); }
+inline unsigned int umin(unsigned int a, unsigned int b) { return a * (a < b) + b * (b <= a); }
 
-// inline
-unsigned int umax(unsigned int a, unsigned int b) { return a * (a > b) + b * (b >= a); }
+inline unsigned int umax(unsigned int a, unsigned int b) { return a * (a > b) + b * (b >= a); }
 
-// inline
-unsigned int cceil(float x) {
+inline unsigned int cceil(float x) {
     int y = (int)x;
     if (x == (float)y) {
         return y;
@@ -281,7 +276,6 @@ void strategie(rman_t* r, int i, int j, int k) {
 
     r->handle.oj[i - 1] = r->sj[i - 1][j][k];
     r->handle.ok[i - 1] = r->sk[i - 1][j][k];
-    printf("%i\n", k);
     strategie(r, i - 1, j - r->handle.oj[i - 1] + r->a[i], k - 1 * r->handle.ok[i - 1]);
 }
 
@@ -380,14 +374,6 @@ int rman_los_op_bu(const rman_handle_t* h, int jokers) {
 
     r->f.f[r->handle.as][0][jokers] = r->f.f[r->handle.as - 1][r->a[r->handle.as]][jokers];
     strategie(r, r->handle.as - 1, r->a[r->handle.as], jokers);
-
-    int sum = 0;
-    for (int i = 0; i < r->handle.as; i++) {
-        float k = (r->handle.ok[i]) ? 0.5f : 1.0f;
-        sum += cceil(k * r->sp[i + 1] * r->handle.oj[i]);
-    }
-    printf("%i\n", sum);
-
     return r->f.f[r->handle.as][0][jokers];
 }
 

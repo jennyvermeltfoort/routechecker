@@ -11,7 +11,7 @@ clean:
 	rm -f *.o TankPlanner
 
 rman.o: rman.c rman.h
-	gcc --std=c99 -Wall -g -c rman.c 
+	gcc -O2 --std=c99 -Wall -g -c rman.c 
 
 standaard.o: standaard.cc standaard.h
 	$(CC) $(CompileParms)  standaard.cc
