@@ -184,12 +184,6 @@ rman_res_e init_man(rman_t* r) {
     }
     r->f.f[0][0][0] = 0;
 
-    // for (int i = 0; i < F_J_GROOT; i++) {
-    //     for (int j = 0; j < F_I_GROOT; j++) {
-    //         r->f.p[i][j][0] = INF;
-    //     }
-    // }
-
     return RMAN_RES_OK;
 }
 
